@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
+import BoringAvatar from "boring-avatars";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -42,6 +43,7 @@ import {
   History,
   User,
 } from "lucide-react"
+import { fetchReports } from "@/lib/api"
 
 interface AdminDashboardProps {
   user: { name: string; role: string } | null
@@ -146,111 +148,26 @@ const assignmentHistory = [
   },
 ]
 
-const mockComplaints = [
-  {
-    id: "C001",
-    title: "Broken streetlight on Main St",
-    description:
-      "The streetlight at the intersection of Main St and Oak Ave has been out for 3 days. This creates a safety hazard for pedestrians and drivers, especially during evening hours.",
-    category: "Infrastructure",
-    priority: "High",
-    status: "In Progress",
-    citizen: "John Smith",
-    citizenEmail: "john.smith@email.com",
-    citizenPhone: "(555) 123-4567",
-    date: "2024-01-15",
-    assignedTo: "Mike Johnson",
-    assignedPersonnelId: "p001",
-    assignedDate: "2024-01-16",
-    location: "Main St & Oak Ave intersection",
-    images: ["/broken-streetlight.png"],
-    escalated: false,
-    slaDeadline: "2024-01-20",
-    departmentId: "public-works",
-    autoRouted: true,
-    workflowStage: "repair-scheduled",
-    updates: [
-      { date: "2024-01-16", message: "Assigned to Mike Johnson", author: "Admin" },
-      { date: "2024-01-17", message: "Work order created, scheduled for repair", author: "Mike Johnson" },
-    ],
-  },
-  {
-    id: "C002",
-    title: "Garbage collection missed",
-    description:
-      "Our garbage was not collected on the scheduled pickup day (Tuesday). This is the second time this month. The bins are overflowing and attracting pests.",
-    category: "Sanitation",
-    priority: "Medium",
-    status: "Pending",
-    citizen: "Mary Johnson",
-    citizenEmail: "mary.johnson@email.com",
-    citizenPhone: "(555) 987-6543",
-    date: "2024-01-14",
-    assignedTo: "Unassigned",
-    assignedPersonnelId: null,
-    assignedDate: null,
-    location: "123 Elm Street",
-    images: ["/overflowing-garbage-bins.png"],
-    escalated: true,
-    slaDeadline: "2024-01-18",
-    departmentId: null,
-    autoRouted: false,
-    workflowStage: "pending-assignment",
-    updates: [],
-  },
-  {
-    id: "C003",
-    title: "Pothole on Oak Avenue",
-    description:
-      "Large pothole causing damage to vehicles. Multiple cars have reported tire damage. The hole is approximately 2 feet wide and 6 inches deep.",
-    category: "Road Maintenance",
-    priority: "High",
-    status: "Completed",
-    citizen: "Robert Davis",
-    citizenEmail: "robert.davis@email.com",
-    citizenPhone: "(555) 456-7890",
-    date: "2024-01-13",
-    assignedTo: "Sarah Chen",
-    assignedPersonnelId: "p002",
-    assignedDate: "2024-01-13",
-    location: "Oak Avenue, near house #456",
-    images: ["/large-pothole-in-road.png"],
-    escalated: false,
-    slaDeadline: "2024-01-18",
-    departmentId: "road-maintenance",
-    autoRouted: true,
-    workflowStage: "completed",
-    updates: [
-      { date: "2024-01-13", message: "Assigned to Sarah Chen", author: "Admin" },
-      { date: "2024-01-14", message: "Repair crew dispatched", author: "Sarah Chen" },
-      { date: "2024-01-15", message: "Pothole filled and road surface restored", author: "Sarah Chen" },
-    ],
-  },
-  {
-    id: "C004",
-    title: "Noise complaint - Construction",
-    description:
-      "Construction work starting at 6 AM violates city noise ordinance. Work should not begin before 7 AM on weekdays.",
-    category: "Noise",
-    priority: "Low",
-    status: "Pending",
-    citizen: "Sarah Wilson",
-    citizenEmail: "sarah.wilson@email.com",
-    citizenPhone: "(555) 234-5678",
-    date: "2024-01-12",
-    assignedTo: "Unassigned",
-    assignedPersonnelId: null,
-    assignedDate: null,
-    location: "Construction site at 789 Pine Street",
-    images: [],
-    escalated: false,
-    slaDeadline: "2024-01-22",
-    departmentId: null,
-    autoRouted: false,
-    workflowStage: "pending-review",
-    updates: [],
-  },
-]
+type Complaint = {
+  id: string
+  title: string
+  description: string
+  createdAt: string
+  category: string
+  name?: string
+  email?: string
+  phone?: string
+  priority?: string
+  status?: string
+  escalated?: boolean
+  autoRouted?: boolean
+  workflowStage?: string
+  location?: string
+  assignedTo?: string
+  slaDeadline?: string
+  photo?: string
+  updates?: { author: string; date: string; message: string }[]
+}
 
 const departments = [
   { id: "public-works", name: "Public Works Department", categories: ["Infrastructure", "Utilities"] },
@@ -276,21 +193,59 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
   const [statusFilter, setStatusFilter] = useState("all")
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [priorityFilter, setPriorityFilter] = useState("all")
-  const [selectedComplaint, setSelectedComplaint] = useState<(typeof mockComplaints)[0] | null>(null)
+  const [complaints, setComplaints] = useState<Complaint[]>([])
+
+  useEffect(() => {
+    let mounted = true
+      ; (async () => {
+        try {
+          const reports = await fetchReports()
+          const mapped: Complaint[] = reports.map((report) => ({
+            id: report._id,
+            title: report.description,
+            description: report.description,
+            createdAt: report.createdAt,
+            category: report.category,
+            name: report.name,
+            priority: "Medium",
+            email: report.email,
+            phone: report.phone,
+            status: "Pending",
+            escalated: false,
+            autoRouted: false,
+            workflowStage: "pending-review",
+            location: report.location,
+            assignedTo: "Unassigned",
+            slaDeadline: "",
+            photo: report.photo,
+            updates: [],
+          }))
+          // console.log("Fetched and mapped reports:", mapped)
+          if (mounted) setComplaints(mapped)
+        } catch (err) {
+          console.error(err)
+        }
+      })()
+
+    return () => {
+      mounted = false
+    }
+  }, [])
+  const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null)
   const [selectedComplaints, setSelectedComplaints] = useState<string[]>([])
   const [bulkAction, setBulkAction] = useState("")
   const [showEscalationDialog, setShowEscalationDialog] = useState(false)
   const [showWorkflowDialog, setShowWorkflowDialog] = useState(false)
   const [showAssignmentDialog, setShowAssignmentDialog] = useState(false)
-  const [assignmentComplaint, setAssignmentComplaint] = useState<(typeof mockComplaints)[0] | null>(null)
+  const [assignmentComplaint, setAssignmentComplaint] = useState<Complaint | null>(null)
   const [selectedPersonnel, setSelectedPersonnel] = useState("")
   const [assignmentNotes, setAssignmentNotes] = useState("")
 
-  const filteredComplaints = mockComplaints.filter((complaint) => {
+  const filteredComplaints = complaints.filter((complaint: any) => {
     const matchesSearch =
-      complaint.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      complaint.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      complaint.citizen.toLowerCase().includes(searchTerm.toLowerCase())
+      (complaint.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (complaint.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (complaint.citizen || '').toLowerCase().includes(searchTerm.toLowerCase())
     const matchesStatus = statusFilter === "all" || complaint.status === statusFilter
     const matchesCategory = categoryFilter === "all" || complaint.category === categoryFilter
     const matchesPriority = priorityFilter === "all" || complaint.priority === priorityFilter
@@ -329,14 +284,14 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
   }
 
   const handleAutoRoute = (complaintId: string) => {
-    const complaint = mockComplaints.find((c) => c.id === complaintId)
+    const complaint = complaints.find((c) => c.id === complaintId)
     if (complaint) {
       const suggestedDept = departments.find((dept) => dept.categories.includes(complaint.category))
       console.log(`Auto-routing complaint ${complaintId} to ${suggestedDept?.name}`)
     }
   }
 
-  const handleAssignComplaint = (complaint: (typeof mockComplaints)[0]) => {
+  const handleAssignComplaint = (complaint: Complaint) => {
     setAssignmentComplaint(complaint)
     setShowAssignmentDialog(true)
   }
@@ -443,7 +398,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                   <FileText className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-primary">247</div>
+                  <div className="text-2xl font-bold text-primary">{complaints.length}</div>
                   <p className="text-xs text-muted-foreground">+12% from last month</p>
                 </CardContent>
               </Card>
@@ -490,7 +445,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {mockComplaints.slice(0, 3).map((complaint) => (
+                  {complaints.slice(0, 3).map((complaint) => (
                     <div
                       key={complaint.id}
                       className="flex items-center justify-between p-4 border border-border rounded-lg"
@@ -498,8 +453,8 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                       <div className="flex-1">
                         <div className="flex items-center space-x-2 mb-2">
                           <Badge variant="outline">{complaint.id}</Badge>
-                          <Badge className={getPriorityColor(complaint.priority)}>{complaint.priority}</Badge>
-                          <Badge className={getStatusColor(complaint.status)}>{complaint.status}</Badge>
+                          <Badge className={getPriorityColor(complaint.priority || "")}>{complaint.priority}</Badge>
+                          <Badge className={getStatusColor(complaint.status || "")}>{complaint.status}</Badge>
                           {complaint.escalated && (
                             <Badge variant="destructive" className="text-xs">
                               <AlertTriangle className="h-3 w-3 mr-1" />
@@ -515,7 +470,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                         </div>
                         <h4 className="font-medium text-foreground">{complaint.title}</h4>
                         <p className="text-sm text-muted-foreground">
-                          {complaint.category} • Reported by {complaint.citizen} • {complaint.date}
+                          {complaint.category} • Reported by {complaint.name} • {new Date(complaint.createdAt).toLocaleDateString()}
                         </p>
                       </div>
                       <Dialog>
@@ -659,8 +614,8 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                       <div className="flex-1">
                         <div className="flex items-center space-x-2 mb-2">
                           <Badge variant="outline">{complaint.id}</Badge>
-                          <Badge className={getPriorityColor(complaint.priority)}>{complaint.priority}</Badge>
-                          <Badge className={getStatusColor(complaint.status)}>{complaint.status}</Badge>
+                          <Badge className={getPriorityColor(complaint.priority || "")}>{complaint.priority}</Badge>
+                          <Badge className={getStatusColor(complaint.status || "")}>{complaint.status}</Badge>
                           {complaint.escalated && (
                             <Badge variant="destructive" className="text-xs">
                               <AlertTriangle className="h-3 w-3 mr-1" />
@@ -679,12 +634,15 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                         </div>
                         <h4 className="font-medium text-foreground">{complaint.title}</h4>
                         <p className="text-sm text-muted-foreground mb-1">
-                          {complaint.category} • {complaint.citizen} • {complaint.date}
+                          {complaint.category} • {complaint.name} • {new Date(complaint.createdAt).toLocaleDateString()}.
                         </p>
                         <p className="text-sm text-muted-foreground">
                           Location: {complaint.location} • Assigned to: {complaint.assignedTo}
                         </p>
-                        <p className="text-xs text-muted-foreground mt-1">SLA Deadline: {complaint.slaDeadline}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          SLA Deadline: {new Date(new Date(complaint.createdAt).setDate(new Date(complaint.createdAt).getDate() + 3)).toLocaleDateString()}
+                        </p>
+
                       </div>
 
                       <div className="flex space-x-2">
@@ -711,7 +669,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                           </Button>
                         )}
 
-                        {!complaint.autoRouted && !complaint.assignedTo.includes("Unassigned") && (
+                        {!complaint.autoRouted && !(complaint.assignedTo || "").includes("Unassigned") && (
                           <Button variant="outline" size="sm" onClick={() => handleAutoRoute(complaint.id)}>
                             <Zap className="h-4 w-4 mr-2" />
                             Auto-Route
@@ -753,13 +711,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                         >
                           <div className="flex items-center space-x-4">
                             <Avatar>
-                              <AvatarImage src={person.avatar || "/placeholder.svg"} alt={person.name} />
-                              <AvatarFallback>
-                                {person.name
-                                  .split(" ")
-                                  .map((n) => n[0])
-                                  .join("")}
-                              </AvatarFallback>
+                              <BoringAvatar name={person.name} variant="pixel"/>
                             </Avatar>
                             <div className="flex-1">
                               <div className="flex items-center space-x-2 mb-1">
@@ -924,11 +876,11 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                 <h4 className="font-medium mb-2">{assignmentComplaint.title}</h4>
                 <p className="text-sm text-muted-foreground mb-2">{assignmentComplaint.description}</p>
                 <div className="flex items-center space-x-2">
-                  <Badge className={getPriorityColor(assignmentComplaint.priority)}>
-                    {assignmentComplaint.priority}
+                  <Badge className={getPriorityColor(assignmentComplaint?.priority || "")}>
+                    {assignmentComplaint?.priority}
                   </Badge>
                   <Badge variant="outline">{assignmentComplaint.category}</Badge>
-                  <span className="text-xs text-muted-foreground">SLA: {assignmentComplaint.slaDeadline}</span>
+                  <span className="text-xs text-muted-foreground">SLA: {new Date(new Date(assignmentComplaint.createdAt).setDate(new Date(assignmentComplaint.createdAt).getDate() + 3)).toLocaleDateString()}</span>
                 </div>
               </div>
 
@@ -971,13 +923,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                         <div>
                           <div className="flex items-center space-x-2 mb-2">
                             <Avatar className="h-8 w-8">
-                              <AvatarImage src={person.avatar || "/placeholder.svg"} alt={person.name} />
-                              <AvatarFallback>
-                                {person.name
-                                  .split(" ")
-                                  .map((n) => n[0])
-                                  .join("")}
-                              </AvatarFallback>
+                              <BoringAvatar name={person.name} variant="pixel" />
                             </Avatar>
                             <div>
                               <p className="font-medium text-sm">{person.name}</p>
@@ -1011,7 +957,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                   <Button variant="outline" onClick={() => setShowAssignmentDialog(false)}>
                     Cancel
                   </Button>
-                  <Button onClick={handleSubmitAssignment} disabled={!selectedPersonnel}>
+                  <Button  disabled={!selectedPersonnel}>
                     <Send className="h-4 w-4 mr-2" />
                     Assign Task
                   </Button>
@@ -1029,7 +975,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
               <DialogHeader>
                 <DialogTitle className="font-serif text-xl">Complaint Details - {selectedComplaint.id}</DialogTitle>
                 <DialogDescription>
-                  Submitted by {selectedComplaint.citizen} on {selectedComplaint.date}
+                  Submitted by {selectedComplaint.name} on {new Date(selectedComplaint.createdAt).toLocaleDateString()}
                 </DialogDescription>
               </DialogHeader>
 
@@ -1052,8 +998,8 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                     </div>
                     <div>
                       <Label className="text-sm font-medium">Priority</Label>
-                      <Badge className={getPriorityColor(selectedComplaint.priority)} variant="secondary">
-                        {selectedComplaint.priority}
+                      <Badge className={getPriorityColor(selectedComplaint?.priority || "")} variant="secondary">
+                        {selectedComplaint?.priority}
                       </Badge>
                     </div>
                   </div>
@@ -1061,8 +1007,8 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label className="text-sm font-medium">Status</Label>
-                      <Badge className={getStatusColor(selectedComplaint.status)} variant="secondary">
-                        {selectedComplaint.status}
+                      <Badge className={getStatusColor(selectedComplaint?.status || "")} variant="secondary">
+                        {selectedComplaint?.status}
                       </Badge>
                     </div>
                     <div>
@@ -1081,24 +1027,17 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                   <div>
                     <Label className="text-sm font-medium">Citizen Information</Label>
                     <div className="mt-2 space-y-1">
-                      <p className="text-sm text-muted-foreground">Name: {selectedComplaint.citizen}</p>
-                      <p className="text-sm text-muted-foreground">Email: {selectedComplaint.citizenEmail}</p>
-                      <p className="text-sm text-muted-foreground">Phone: {selectedComplaint.citizenPhone}</p>
+                      <p className="text-sm text-muted-foreground">Name: {selectedComplaint.name}</p>
+                      <p className="text-sm text-muted-foreground">Email: {selectedComplaint.email}</p>
+                      <p className="text-sm text-muted-foreground">Phone: {selectedComplaint.phone}</p>
                     </div>
                   </div>
 
-                  {selectedComplaint.images.length > 0 && (
+                  {selectedComplaint.photo && (
                     <div>
                       <Label className="text-sm font-medium">Attached Images</Label>
                       <div className="mt-2 grid grid-cols-2 gap-2">
-                        {selectedComplaint.images.map((image, index) => (
-                          <img
-                            key={index}
-                            src={image || "/placeholder.svg"}
-                            alt={`Complaint image ${index + 1}`}
-                            className="w-full h-32 object-cover rounded-md border"
-                          />
-                        ))}
+                        <img src={selectedComplaint.photo}  className="w-full h-28 object-cover rounded-md border" />
                       </div>
                     </div>
                   )}
@@ -1106,7 +1045,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                   <div>
                     <Label className="text-sm font-medium">Progress Updates</Label>
                     <div className="mt-2 space-y-2 max-h-40 overflow-y-auto">
-                      {selectedComplaint.updates.length > 0 ? (
+                      {selectedComplaint.updates && selectedComplaint.updates.length > 0 ? (
                         selectedComplaint.updates.map((update, index) => (
                           <div key={index} className="p-3 bg-muted rounded-md">
                             <div className="flex justify-between items-start mb-1">

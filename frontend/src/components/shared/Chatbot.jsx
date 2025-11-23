@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import React, { useState } from "react";
 import axios from "axios";
 import { MessageCircle } from "lucide-react"; // icon library (optional)
@@ -9,6 +10,16 @@ const Chatbot  = () => {
   ]);
   const [input, setInput] = useState("");
 
+  // ensure a persistent session id for conversational context
+  const getSessionId = () => {
+    let sid = localStorage.getItem("cc_chat_session_id");
+    if (!sid) {
+      sid = Math.random().toString(36).substring(2, 10);
+      localStorage.setItem("cc_chat_session_id", sid);
+    }
+    return sid;
+  };
+
   const sendMessage = async () => {
     if (!input.trim()) return;
 
@@ -18,8 +29,14 @@ const Chatbot  = () => {
     try {
       const res = await axios.post("http://localhost:5000/chat", {
         message: input,
+        session_id: getSessionId(),
       });
-      setMessages([...newMessages, { sender: "bot", text: res.data.reply }]);
+
+      const botMsg = { sender: "bot", text: res.data.reply };
+      // if action present, attach it so we can render buttons
+      if (res.data.action) botMsg.action = res.data.action;
+
+      setMessages([...newMessages, botMsg]);
     } catch (err) {
       setMessages([...newMessages, { sender: "bot", text: "⚠️ Sorry, something went wrong." }]);
     }
@@ -59,7 +76,24 @@ const Chatbot  = () => {
                     : "bg-green-200 text-right self-end"
                 }`}
               >
-                {msg.text}
+                <div>{msg.text}</div>
+                {msg.action && msg.action.type === "navigate" && (
+                  <div className="mt-2">
+                    <button
+                      onClick={() => {
+                        // use client-side navigation if app provides routes, otherwise do full redirect
+                        try {
+                          window.location.assign(msg.action.route);
+                        } catch (e) {
+                          window.location.href = msg.action.route;
+                        }
+                      }}
+                      className="mt-1 bg-blue-600 text-white px-2 py-1 rounded"
+                    >
+                      Open {msg.action.route}
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>

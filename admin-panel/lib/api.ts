@@ -1,5 +1,12 @@
 // src/api.ts
 export interface Report {
+  phone: any;
+  email: any;
+  photo: any;
+  location: any;
+  category: any;
+  name: string;
+  createdAt: any;
   _id: string;
   title: string;
   description: string;

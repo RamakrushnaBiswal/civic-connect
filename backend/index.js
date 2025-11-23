@@ -24,10 +24,7 @@ mongoose.connect(process.env.MONGO_URI, {
 app.use(express.json());
 app.use(cookieParser());
 app.use('/uploads', express.static('uploads'));
-app.use(cors({
-  origin: process.env.FRONTEND_URL,
-  credentials: true
-}));
+app.use(cors());
 app.use(passport.initialize());
 
 // Routes
