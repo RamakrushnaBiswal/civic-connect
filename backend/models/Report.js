@@ -28,27 +28,23 @@ const ReportSchema = new mongoose.Schema({
   title: { type: String, required: true },
   description: { type: String, required: true },
   category: { type: String, required: true },
-  priority: { type: String, required: true },
-  status: { type: String, required: true },
-  citizen: { type: String, required: true },
+  priority: { type: String, required: true, enum: ["Low", "Medium", "High", "Critical"]},
+  status: { type: String, required: true,default:"pending", enum: ["pending", "in progress", "resolved", "closed"] },
+  name: { type: String, required: true },
   email: { type: String, required: true },
   phone: { type: String, required: true },
-  date: { type: Date, required: true },
-  assignedTo: { type: String },
-  assignedPersonnelId: { type: String },
-  assignedDate: { type: Date },
+  assignedTo: { type: String,default:null },
+  assignedPersonnelId: { type: String, default: null },
+  assignedDate: { type: Date, default: null },
   location: { type: String, required: true },
   coordinates: {
     lat: Number,
     lng: Number
   },
-  photo: { type: String },
-  images: [{ type: String }],
+  photo: { type: String,required: true },
   escalated: { type: Boolean, default: false },
-  departmentId: { type: String, required: true },
-  autoRouted: { type: Boolean, default: false },
-  workflowStage: { type: String },
+  workflowStage: { type: String, default: "New",enum: ["New", "In Progress", "Under Review", "Resolved", "Closed"] },
   updates: [updateSchema]
-});
+},{ timestamps: true });
 
 module.exports = mongoose.model('Report', ReportSchema);

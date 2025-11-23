@@ -14,6 +14,12 @@ const categories = [
   "Street",
   "Udyan",
 ];
+const priorities = [
+  "Low",
+  "Medium",
+  "High",
+  "Critical"
+];
 
 const MAPTILER_KEY = "ssjepsOfxXaqATsEknxl";
 
@@ -43,6 +49,8 @@ const mapStyles = [
 const ReportForm = () => {
   const [form, setForm] = useState({
     name: "",
+    title:"",
+    priority: "",
     email: "",
     phone: "",
     category: "",
@@ -142,9 +150,11 @@ const ReportForm = () => {
     formData.append("id", uuidv4()); //complain id
     formData.append("name", form.name);
     formData.append("email", form.email);
+    formData.append("title", form.title);
     formData.append("phone", form.phone);
     formData.append("category", form.category); //dept
     formData.append("location", form.location);
+    formData.append("priority", form.priority);
     formData.append("description", form.description);
     formData.append("coordinates", JSON.stringify(coords));
     if (photo) formData.append("photo", photo);//uploadeed photo
@@ -176,6 +186,8 @@ const ReportForm = () => {
     setForm({
       name: "",
       email: "",
+      title:"",
+      priority: "",
       phone: "",
       category: "",
       location: "",
@@ -206,6 +218,15 @@ const ReportForm = () => {
           value={form.name}
           onChange={handleChange}
           placeholder="Your Name"
+          className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-blue-500 outline-none"
+          required
+        />
+        <input
+          type="text"
+          name="title"
+          value={form.title}
+          onChange={handleChange}
+          placeholder="Title of the Issue"
           className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-blue-500 outline-none"
           required
         />
@@ -265,6 +286,22 @@ const ReportForm = () => {
           {categories.map((cat) => (
             <option key={cat} value={cat}>
               {cat}
+            </option>
+          ))}
+        </select>
+        <select
+          name="priority"
+          value={form.priority}
+          onChange={handleChange}
+          className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-blue-500 outline-none"
+          required
+        >
+          <option value="" disabled>
+            Select Issue Priority
+          </option>
+          {priorities.map((priority) => (
+            <option key={priority} value={priority}>
+              {priority}
             </option>
           ))}
         </select>

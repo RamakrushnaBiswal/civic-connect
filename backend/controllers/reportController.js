@@ -18,7 +18,9 @@ exports.addReport = async (req, res) => {
       email,
       phone,
       category,
+      priority,
       location,
+      title,
       description,
       coordinates,
     } = req.body;
@@ -63,6 +65,8 @@ if (!Array.isArray(coordsArray) || coordsArray.length !== 2) {
       name,
       email,
       phone,
+      title,
+      priority,
       category,
       location,
       description,

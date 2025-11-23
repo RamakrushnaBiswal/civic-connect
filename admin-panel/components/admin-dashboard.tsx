@@ -202,7 +202,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
           const reports = await fetchReports()
           const mapped: Complaint[] = reports.map((report) => ({
             id: report._id,
-            title: report.description,
+            title: report.title,
             description: report.description,
             createdAt: report.createdAt,
             category: report.category,
