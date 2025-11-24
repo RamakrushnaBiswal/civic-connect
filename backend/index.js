@@ -3,6 +3,8 @@ const mongoose = require('mongoose');
 const passport = require('passport');
 const cookieParser = require('cookie-parser');
 const reportRoutes = require('./routes/reportRoutes');
+const personnelRoutes = require('./routes/personnelRoutes');
+const feedbackRoutes = require('./routes/feedbackRoutes');
 const cors = require('cors');
 require('dotenv').config();
 
@@ -31,6 +33,8 @@ app.use(passport.initialize());
 app.use('/api', userRoutes);
 app.use('/api', authRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/personnel', personnelRoutes);
+app.use('/api/feedback', feedbackRoutes);
 
 // Start server
 const PORT = process.env.PORT || 5000;

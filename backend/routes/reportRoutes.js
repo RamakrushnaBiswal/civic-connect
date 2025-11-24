@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { addReport,showReports,getReportById,updateReport } = require('../controllers/reportController');
+const { addReport,showReports,getReportById,updateReport, assignReport,unassignReport } = require('../controllers/reportController');
 
 const multer = require('multer');
 const path = require('path');
@@ -20,5 +20,7 @@ router.post('/add-report', upload.single('photo'), addReport);
 router.get('/show-reports', showReports);
 router.get('/reports/:id', getReportById);
 router.put('/reports/:id', updateReport);
+router.put('/reports/:id/assign', assignReport);
+router.put('/reports/:id/unassign', unassignReport);
 
 module.exports = router;

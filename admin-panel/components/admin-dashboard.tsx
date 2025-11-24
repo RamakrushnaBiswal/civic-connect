@@ -43,80 +43,26 @@ import {
   History,
   User,
 } from "lucide-react"
-import { fetchReports } from "@/lib/api"
+import { fetchReports, updateReport, assignReport, fetchPersonnel, unassignReport, createPersonnel, updatePersonnel, fetchFeedbacks } from "@/lib/api"
 
 interface AdminDashboardProps {
   user: { name: string; role: string } | null
   onLogout: () => void
 }
 
-const personnel = [
-  {
-    id: "p001",
-    name: "Mike Johnson",
-    role: "Senior Technician",
-    department: "public-works",
-    email: "mike.johnson@city.gov",
-    phone: "(555) 101-2001",
-    availability: "Available",
-    currentWorkload: 3,
-    maxWorkload: 8,
-    skills: ["Electrical", "Street Lighting", "Traffic Signals"],
-    avatar: "/placeholder.svg?height=40&width=40",
-  },
-  {
-    id: "p002",
-    name: "Sarah Chen",
-    role: "Maintenance Supervisor",
-    department: "road-maintenance",
-    email: "sarah.chen@city.gov",
-    phone: "(555) 101-2002",
-    availability: "Busy",
-    currentWorkload: 7,
-    maxWorkload: 8,
-    skills: ["Road Repair", "Pothole Filling", "Asphalt Work"],
-    avatar: "/placeholder.svg?height=40&width=40",
-  },
-  {
-    id: "p003",
-    name: "David Rodriguez",
-    role: "Sanitation Coordinator",
-    department: "sanitation",
-    email: "david.rodriguez@city.gov",
-    phone: "(555) 101-2003",
-    availability: "Available",
-    currentWorkload: 2,
-    maxWorkload: 6,
-    skills: ["Waste Collection", "Route Planning", "Equipment Maintenance"],
-    avatar: "/placeholder.svg?height=40&width=40",
-  },
-  {
-    id: "p004",
-    name: "Lisa Thompson",
-    role: "Code Enforcement Officer",
-    department: "code-enforcement",
-    email: "lisa.thompson@city.gov",
-    phone: "(555) 101-2004",
-    availability: "On Leave",
-    currentWorkload: 0,
-    maxWorkload: 5,
-    skills: ["Noise Violations", "Building Codes", "Permit Inspection"],
-    avatar: "/placeholder.svg?height=40&width=40",
-  },
-  {
-    id: "p005",
-    name: "James Wilson",
-    role: "Parks Maintenance",
-    department: "parks-recreation",
-    email: "james.wilson@city.gov",
-    phone: "(555) 101-2005",
-    availability: "Available",
-    currentWorkload: 4,
-    maxWorkload: 7,
-    skills: ["Landscaping", "Equipment Repair", "Facility Maintenance"],
-    avatar: "/placeholder.svg?height=40&width=40",
-  },
-]
+interface Personnel {
+  id: string
+  name: string
+  role?: string
+  department?: string
+  availability?: string
+  currentWorkload?: number
+  maxWorkload?: number
+  avatar?: string
+  email?: string
+  phone?: string
+  skills?: string[]
+}
 
 const assignmentHistory = [
   {
@@ -134,8 +80,8 @@ const assignmentHistory = [
     assignedTo: "Sarah Chen",
     assignedBy: "Admin",
     assignedDate: "2024-01-13",
-    status: "Completed",
-    notes: "Completed ahead of schedule",
+    status: "resolved",
+    notes: "resolved ahead of schedule",
   },
   {
     id: "ah003",
@@ -164,6 +110,7 @@ type Complaint = {
   workflowStage?: string
   location?: string
   assignedTo?: string
+  assignedPersonnelId?: string
   slaDeadline?: string
   photo?: string
   updates?: { author: string; date: string; message: string }[]
@@ -183,7 +130,7 @@ const workflowStages = {
   assigned: "Assigned",
   "in-progress": "In Progress",
   "repair-scheduled": "Repair Scheduled",
-  completed: "Completed",
+  resolved: "resolved",
   escalated: "Escalated",
 }
 
@@ -194,36 +141,112 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [priorityFilter, setPriorityFilter] = useState("all")
   const [complaints, setComplaints] = useState<Complaint[]>([])
+  const [personnel, setPersonnel] = useState<Personnel[]>([])
+  const [feedbacks, setFeedbacks] = useState<any[]>([])
+
+  useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      try {
+        const p = await fetchPersonnel()
+        if (mounted && Array.isArray(p)) setPersonnel(p)
+      } catch (err) {
+        console.error('Failed to fetch personnel', err)
+      }
+    })()
+
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  // Add personnel dialog state and form
+  const [showAddPersonnelDialog, setShowAddPersonnelDialog] = useState(false)
+  const [newName, setNewName] = useState("")
+  const [newRole, setNewRole] = useState("")
+  const [newDepartment, setNewDepartment] = useState("")
+  const [newEmail, setNewEmail] = useState("")
+  const [newPhone, setNewPhone] = useState("")
+  const [newAvailability, setNewAvailability] = useState("Available")
+  const [newMaxWorkload, setNewMaxWorkload] = useState<number>(8)
+  const [newSkills, setNewSkills] = useState("")
+
+  const handleCreatePersonnel = async () => {
+    if (!newName.trim()) return
+    const payload = {
+      name: newName.trim(),
+      role: newRole.trim() || undefined,
+      department: newDepartment || undefined,
+      email: newEmail || undefined,
+      phone: newPhone || undefined,
+      availability: newAvailability || undefined,
+      maxWorkload: Number(newMaxWorkload) || 8,
+      skills: newSkills ? newSkills.split(',').map(s => s.trim()).filter(Boolean) : undefined,
+    }
+
+    try {
+      const res = await createPersonnel(payload)
+      const person = res && (res.person || res)
+      if (person) {
+        // refresh personnel list
+        const refreshed = await fetchPersonnel()
+        if (Array.isArray(refreshed)) setPersonnel(refreshed)
+      }
+      // reset and close
+      setNewName("")
+      setNewRole("")
+      setNewDepartment("")
+      setNewEmail("")
+      setNewPhone("")
+      setNewAvailability("Available")
+      setNewMaxWorkload(8)
+      setNewSkills("")
+      setShowAddPersonnelDialog(false)
+    } catch (err) {
+      console.error('Failed to create personnel', err)
+    }
+  }
+
+  const mapReportToComplaint = (report: any): Complaint => ({
+    id: report.id || report._id,
+    title: report.title,
+    description: report.description,
+    createdAt: report.createdAt || report.date || new Date().toISOString(),
+    category: report.category,
+    name: report.name,
+    priority: report.priority,
+    email: report.email,
+    phone: report.phone,
+    status: report.status || "Pending",
+    escalated: !!report.escalated,
+    workflowStage: report.workflowStage || "pending-review",
+    location: report.location,
+    assignedTo: report.assignedTo || (report.assignedPersonnelId ? (personnel.find((p) => p.id === report.assignedPersonnelId)?.name) : "Unassigned") || "Unassigned",
+    assignedPersonnelId: report.assignedPersonnelId || null,
+    slaDeadline: "",
+    photo: report.photo,
+    updates: report.updates || [],
+  })
 
   useEffect(() => {
     let mounted = true
       ; (async () => {
         try {
           const reports = await fetchReports()
-          const mapped: Complaint[] = reports.map((report) => ({
-            id: report._id,
-            title: report.title,
-            description: report.description,
-            createdAt: report.createdAt,
-            category: report.category,
-            name: report.name,
-            priority: "Medium",
-            email: report.email,
-            phone: report.phone,
-            status: "Pending",
-            escalated: false,
-            autoRouted: false,
-            workflowStage: "pending-review",
-            location: report.location,
-            assignedTo: "Unassigned",
-            slaDeadline: "",
-            photo: report.photo,
-            updates: [],
-          }))
+          const mapped: Complaint[] = reports.map(mapReportToComplaint)
           // console.log("Fetched and mapped reports:", mapped)
           if (mounted) setComplaints(mapped)
         } catch (err) {
           console.error(err)
+        }
+      })()
+
+      ; (async () => {
+        try {
+          const f = await fetchFeedbacks()
+          if (mounted && Array.isArray(f)) setFeedbacks(f)
+        } catch (err) {
+          console.error('Failed to fetch feedbacks', err)
         }
       })()
 
@@ -240,6 +263,21 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
   const [assignmentComplaint, setAssignmentComplaint] = useState<Complaint | null>(null)
   const [selectedPersonnel, setSelectedPersonnel] = useState("")
   const [assignmentNotes, setAssignmentNotes] = useState("")
+  const [newUpdateText, setNewUpdateText] = useState("")
+  // View / Edit personnel dialog state
+  const [showViewPersonDialog, setShowViewPersonDialog] = useState(false)
+  const [showEditPersonDialog, setShowEditPersonDialog] = useState(false)
+  const [selectedPerson, setSelectedPerson] = useState<Personnel | null>(null)
+
+  // Edit form fields
+  const [editName, setEditName] = useState("")
+  const [editRole, setEditRole] = useState("")
+  const [editDepartment, setEditDepartment] = useState("")
+  const [editEmail, setEditEmail] = useState("")
+  const [editPhone, setEditPhone] = useState("")
+  const [editAvailability, setEditAvailability] = useState("")
+  const [editMaxWorkload, setEditMaxWorkload] = useState<number>(8)
+  const [editSkills, setEditSkills] = useState("")
 
   const filteredComplaints = complaints.filter((complaint: any) => {
     const matchesSearch =
@@ -278,18 +316,22 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
     }
   }
 
-  const handleEscalateComplaint = (complaintId: string) => {
-    console.log(`Escalating complaint: ${complaintId}`)
-    // In a real app, this would make an API call
-  }
+  const handleToggleEscalation = async (complaintId: string, currentlyEscalated?: boolean) => {
+    const newValue = !currentlyEscalated
+    // console.log(`${newValue ? 'Escalating' : 'De-escalating'} complaint: ${complaintId}`)
+    // Optimistic UI update
+    setComplaints((prev) => prev.map((c) => (c.id === complaintId ? { ...c, escalated: newValue } : c)))
 
-  const handleAutoRoute = (complaintId: string) => {
-    const complaint = complaints.find((c) => c.id === complaintId)
-    if (complaint) {
-      const suggestedDept = departments.find((dept) => dept.categories.includes(complaint.category))
-      console.log(`Auto-routing complaint ${complaintId} to ${suggestedDept?.name}`)
+    try {
+      await updateReport(complaintId, { escalated: newValue })
+      // console.log(`Escalation updated on server for ${complaintId}: ${newValue}`)
+    } catch (err) {
+      console.error('Failed to update escalation on server, reverting UI change', err)
+      // Revert optimistic update
+      setComplaints((prev) => prev.map((c) => (c.id === complaintId ? { ...c, escalated: currentlyEscalated } : c)))
     }
   }
+
 
   const handleAssignComplaint = (complaint: Complaint) => {
     setAssignmentComplaint(complaint)
@@ -297,19 +339,187 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
   }
 
   const handleSubmitAssignment = () => {
-    if (assignmentComplaint && selectedPersonnel) {
+    ;(async () => {
+      if (!(assignmentComplaint && selectedPersonnel)) return
+
       const person = personnel.find((p) => p.id === selectedPersonnel)
-      console.log(`Assigning complaint ${assignmentComplaint.id} to ${person?.name}`)
-      console.log(`Assignment notes: ${assignmentNotes}`)
-      // In a real app, this would make an API call
+      const assigneeName = person?.name || selectedPersonnel
+      const complaintId = assignmentComplaint.id
+
+      // optimistic UI
+      const prevComplaints = complaints
+      const prevSelected = assignmentComplaint
+
+      const optimistic = { ...assignmentComplaint, assignedTo: assigneeName, updates: [...(assignmentComplaint.updates || []), { author: user?.name || 'Admin', date: new Date().toISOString(), message: `Assigned to ${assigneeName}` }] }
+      setComplaints((prev) => prev.map((c) => (c.id === complaintId ? optimistic : c)))
       setShowAssignmentDialog(false)
       setAssignmentComplaint(null)
       setSelectedPersonnel("")
       setAssignmentNotes("")
+
+      try {
+        const res = await assignReport(complaintId, { assignedTo: assigneeName, note: assignmentNotes, assignedBy: user?.name, assignedPersonnelId: selectedPersonnel })
+        const updatedReport = (res && (res.report || res)) || null
+        if (updatedReport) {
+          const updatedComplaint = mapReportToComplaint(updatedReport)
+          setComplaints((prev) => prev.map((c) => (c.id === complaintId ? updatedComplaint : c)))
+          // refresh personnel list so workload changes are visible immediately
+          try {
+            const refreshed = await fetchPersonnel()
+            if (Array.isArray(refreshed)) setPersonnel(refreshed)
+          } catch (pf) {
+            console.warn('Failed to refresh personnel after assignment', pf)
+          }
+        }
+      } catch (err) {
+        console.error('Failed to assign on server, reverting', err)
+        setComplaints(prevComplaints)
+      }
+    })()
+  }
+
+  const handleUnassignAssignment = () => {
+    ;(async () => {
+      if (!assignmentComplaint) return
+
+      const complaintId = assignmentComplaint.id
+
+      // optimistic UI: mark as unassigned locally
+      const prevComplaints = complaints
+      const prevAssignment = assignmentComplaint
+      const optimistic = { ...assignmentComplaint, assignedTo: 'Unassigned', updates: [...(assignmentComplaint.updates || []), { author: user?.name || 'Admin', date: new Date().toISOString(), message: `Unassigned` }] }
+      setComplaints((prev) => prev.map((c) => (c.id === complaintId ? optimistic : c)))
+
+      try {
+        const res = await unassignReport(complaintId, { unassignedBy: user?.name })
+        const updatedReport = (res && (res.report || res)) || null
+        if (updatedReport) {
+          const updatedComplaint = mapReportToComplaint(updatedReport)
+          setComplaints((prev) => prev.map((c) => (c.id === complaintId ? updatedComplaint : c)))
+          // refresh personnel list
+          try {
+            const refreshed = await fetchPersonnel()
+            if (Array.isArray(refreshed)) setPersonnel(refreshed)
+          } catch (pf) {
+            console.warn('Failed to refresh personnel after unassign', pf)
+          }
+        }
+      } catch (err) {
+        console.error('Failed to unassign on server, reverting', err)
+        setComplaints(prevComplaints)
+        // restore selection
+        setAssignmentComplaint(prevAssignment)
+      }
+    })()
+  }
+
+  // Unassign a specific complaint directly from the list
+  const handleUnassignComplaint = (complaint: Complaint) => {
+    ;(async () => {
+      const complaintId = complaint.id
+      const prevComplaints = complaints
+
+      const optimistic = {
+        ...complaint,
+        assignedTo: 'Unassigned',
+        assignedPersonnelId: undefined,
+        updates: [...(complaint.updates || []), { author: user?.name || 'Admin', date: new Date().toISOString(), message: `Unassigned` }],
+      }
+
+      setComplaints((prev) => prev.map((c) => (c.id === complaintId ? optimistic : c)))
+
+      try {
+        const res = await unassignReport(complaintId, { unassignedBy: user?.name })
+        const updatedReport = (res && (res.report || res)) || null
+        if (updatedReport) {
+          const updatedComplaint = mapReportToComplaint(updatedReport)
+          setComplaints((prev) => prev.map((c) => (c.id === complaintId ? updatedComplaint : c)))
+          try {
+            const refreshed = await fetchPersonnel()
+            if (Array.isArray(refreshed)) setPersonnel(refreshed)
+          } catch (pf) {
+            console.warn('Failed to refresh personnel after unassign', pf)
+          }
+        }
+      } catch (err) {
+        console.error('Failed to unassign on server, reverting', err)
+        setComplaints(prevComplaints)
+      }
+    })()
+  }
+
+  const handleAddUpdate = async () => {
+    if (!selectedComplaint || !newUpdateText.trim()) return
+
+    const complaintId = selectedComplaint.id
+    const author = user?.name || "Admin"
+    const newUpdate = { author, date: new Date().toISOString(), message: newUpdateText.trim() }
+
+    // Keep previous state to revert if needed
+    const prevSelected = selectedComplaint
+    const prevComplaints = complaints
+
+    // Optimistic UI update: add update locally
+    const optimisticSelected: Complaint = {
+      ...selectedComplaint,
+      updates: [...(selectedComplaint.updates || []), newUpdate],
+    }
+    setSelectedComplaint(optimisticSelected)
+    setComplaints((prev) => prev.map((c) => (c.id === complaintId ? optimisticSelected : c)))
+    setNewUpdateText("")
+
+    try {
+      const res = await updateReport(complaintId, { updates: optimisticSelected.updates })
+      const updatedReport = (res && (res.report || res)) || null
+      if (updatedReport) {
+        const updatedComplaint = mapReportToComplaint(updatedReport)
+        setSelectedComplaint(updatedComplaint)
+        setComplaints((prev) => prev.map((c) => (c.id === complaintId ? updatedComplaint : c)))
+      }
+    } catch (err) {
+      console.error("Failed to add update:", err)
+      // revert
+      setSelectedComplaint(prevSelected)
+      setComplaints(prevComplaints)
+      // restore text so admin can retry
+      setNewUpdateText(newUpdate.message)
     }
   }
 
-  const getAvailabilityColor = (availability: string) => {
+  const handleUpdatePersonnelSubmit = async () => {
+    if (!selectedPerson) return
+    const id = selectedPerson.id
+    const payload: Record<string, any> = {
+      name: editName.trim(),
+      role: editRole || undefined,
+      department: editDepartment || undefined,
+      email: editEmail || undefined,
+      phone: editPhone || undefined,
+      availability: editAvailability || undefined,
+      maxWorkload: Number(editMaxWorkload) || 8,
+      skills: editSkills ? editSkills.split(',').map((s) => s.trim()).filter(Boolean) : undefined,
+    }
+
+    try {
+      const res = await updatePersonnel(id, payload)
+      const person = (res && (res.person || res)) || null
+      if (person) {
+        // refresh list
+        try {
+          const refreshed = await fetchPersonnel()
+          if (Array.isArray(refreshed)) setPersonnel(refreshed)
+        } catch (pf) {
+          console.warn('Failed to refresh personnel after update', pf)
+        }
+        setSelectedPerson(person)
+        setShowEditPersonDialog(false)
+      }
+    } catch (err) {
+      console.error('Failed to update personnel', err)
+    }
+  }
+
+  const getAvailabilityColor = (availability?: string) => {
     switch (availability) {
       case "Available":
         return "bg-green-100 text-green-800"
@@ -324,10 +534,10 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "Completed":
+      case "resolved":
         return "bg-green-100 text-green-800"
       case "In Progress":
-        return "bg-blue-100 text-blue-800"
+        return "bg-blue-500 text-blue-700"
       case "Pending":
         return "bg-yellow-100 text-yellow-800"
       default:
@@ -348,9 +558,38 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
     }
   }
 
-  const handleStatusUpdate = (complaintId: string, newStatus: string) => {
-    // In a real app, this would make an API call
-    console.log(`Updating complaint ${complaintId} to status: ${newStatus}`)
+  const handleStatusUpdate = async (complaintId: string, newStatus: string) => {
+    // Map UI status values to backend expected values if needed
+    const statusMap: Record<string, string> = {
+      "Pending": "pending",
+      "In Progress": "in progress",
+      "resolved": "resolved",
+      "Resolved": "resolved",
+      "Closed": "closed",
+    }
+
+    const backendStatus = statusMap[newStatus] || newStatus
+
+    // Find current value to allow revert on failure
+    const prev = complaints.find((c) => c.id === complaintId)
+    const prevStatus = prev?.status
+
+    // Optimistic UI update (show human-friendly label)
+    setComplaints((prevList) => prevList.map((c) => (c.id === complaintId ? { ...c, status: newStatus } : c)))
+
+    try {
+      const res = await updateReport(complaintId, { status: backendStatus })
+      // backend may return updated report in res.report or res.report
+      const updatedReport = (res && (res.report || res)) || null
+      if (updatedReport) {
+        const updatedComplaint = mapReportToComplaint(updatedReport)
+        setComplaints((prevList) => prevList.map((c) => (c.id === complaintId ? updatedComplaint : c)))
+      }
+    } catch (err) {
+      console.error(`Failed to update status for ${complaintId}`, err)
+      // revert
+      setComplaints((prevList) => prevList.map((c) => (c.id === complaintId ? { ...c, status: prevStatus || "Pending" } : c)))
+    }
   }
 
   return (
@@ -386,7 +625,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="complaints">Complaints</TabsTrigger>
             <TabsTrigger value="assignments">Assignments</TabsTrigger>
-            <TabsTrigger value="reports">Reports</TabsTrigger>
+            <TabsTrigger value="feedback">Feedback</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
@@ -461,12 +700,6 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                               Escalated
                             </Badge>
                           )}
-                          {complaint.autoRouted && (
-                            <Badge variant="secondary" className="text-xs">
-                              <Zap className="h-3 w-3 mr-1" />
-                              Auto-Routed
-                            </Badge>
-                          )}
                         </div>
                         <h4 className="font-medium text-foreground">{complaint.title}</h4>
                         <p className="text-sm text-muted-foreground">
@@ -512,7 +745,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                       <SelectItem value="all">All Statuses</SelectItem>
                       <SelectItem value="Pending">Pending</SelectItem>
                       <SelectItem value="In Progress">In Progress</SelectItem>
-                      <SelectItem value="Completed">Completed</SelectItem>
+                      <SelectItem value="resolved">resolved</SelectItem>
                     </SelectContent>
                   </Select>
                   <Select value={categoryFilter} onValueChange={setCategoryFilter}>
@@ -662,19 +895,15 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                           </Button>
                         )}
 
-                        {!complaint.escalated && (
-                          <Button variant="outline" size="sm" onClick={() => handleEscalateComplaint(complaint.id)}>
-                            <ArrowUp className="h-4 w-4 mr-2" />
-                            Escalate
-                          </Button>
-                        )}
+                        <Button
+                          variant={complaint.escalated ? "destructive" : "outline"}
+                          size="sm"
+                          onClick={() => handleToggleEscalation(complaint.id, complaint.escalated)}
+                        >
+                          <ArrowUp className="h-4 w-4 mr-2" />
+                          {complaint.escalated ? "De-escalate" : "Escalate"}
+                        </Button>
 
-                        {!complaint.autoRouted && !(complaint.assignedTo || "").includes("Unassigned") && (
-                          <Button variant="outline" size="sm" onClick={() => handleAutoRoute(complaint.id)}>
-                            <Zap className="h-4 w-4 mr-2" />
-                            Auto-Route
-                          </Button>
-                        )}
 
                         <Select onValueChange={(value) => handleStatusUpdate(complaint.id, value)}>
                           <SelectTrigger className="w-32">
@@ -683,7 +912,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                           <SelectContent>
                             <SelectItem value="Pending">Pending</SelectItem>
                             <SelectItem value="In Progress">In Progress</SelectItem>
-                            <SelectItem value="Completed">Completed</SelectItem>
+                            <SelectItem value="resolved">resolved</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -717,7 +946,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                               <div className="flex items-center space-x-2 mb-1">
                                 <h4 className="font-medium text-foreground">{person.name}</h4>
                                 <Badge className={getAvailabilityColor(person.availability)}>
-                                  {person.availability}
+                                  {person.availability || "Unknown"}
                                 </Badge>
                               </div>
                               <p className="text-sm text-muted-foreground">{person.role}</p>
@@ -727,24 +956,37 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                               <div className="flex items-center space-x-2 mt-2">
                                 <span className="text-xs text-muted-foreground">Workload:</span>
                                 <Progress
-                                  value={(person.currentWorkload / person.maxWorkload) * 100}
+                                  value={((person.currentWorkload || 0) / (person.maxWorkload || 1)) * 100}
                                   className="w-20 h-2"
                                 />
                                 <span className="text-xs text-muted-foreground">
-                                  {person.currentWorkload}/{person.maxWorkload}
+                                  {person.currentWorkload || 0}/{person.maxWorkload || 0}
                                 </span>
                               </div>
                             </div>
                           </div>
                           <div className="flex items-center space-x-2">
-                            <Button variant="outline" size="sm">
+                            <Button variant="outline" size="sm" onClick={() => { setSelectedPerson(person); setShowViewPersonDialog(true) }}>
                               <User className="h-4 w-4 mr-2" />
                               View Profile
                             </Button>
-                            <Button variant="outline" size="sm">
+                            <Button variant="outline" size="sm" onClick={() => {
+                              // open edit dialog and prefill
+                              setSelectedPerson(person)
+                              setEditName(person.name || "")
+                              setEditRole(person.role || "")
+                              setEditDepartment(person.department || "")
+                              setEditEmail(person.email || "")
+                              setEditPhone(person.phone || "")
+                              setEditAvailability(person.availability || "Available")
+                              setEditMaxWorkload(person.maxWorkload || 8)
+                              setEditSkills((person.skills || []).join(", "))
+                              setShowEditPersonDialog(true)
+                            }}>
                               <Calendar className="h-4 w-4 mr-2" />
-                              Schedule
+                              Update
                             </Button>
+                            {/* Unassign All removed — use per-complaint unassign instead */}
                           </div>
                         </div>
                       ))}
@@ -794,8 +1036,8 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                     <div className="space-y-4">
                       {departments.map((dept) => {
                         const deptPersonnel = personnel.filter((p) => p.department === dept.id)
-                        const totalWorkload = deptPersonnel.reduce((sum, p) => sum + p.currentWorkload, 0)
-                        const maxCapacity = deptPersonnel.reduce((sum, p) => sum + p.maxWorkload, 0)
+                        const totalWorkload = deptPersonnel.reduce((sum, p) => sum + (p.currentWorkload || 0), 0)
+                        const maxCapacity = deptPersonnel.reduce((sum, p) => sum + (p.maxWorkload || 0), 0)
                         const utilizationRate = maxCapacity > 0 ? (totalWorkload / maxCapacity) * 100 : 0
 
                         return (
@@ -825,10 +1067,74 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                     <CardTitle className="font-serif">Quick Actions</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2">
-                    <Button className="w-full justify-start">
-                      <UserPlus className="h-4 w-4 mr-2" />
-                      Add New Personnel
-                    </Button>
+                    <Dialog open={showAddPersonnelDialog} onOpenChange={setShowAddPersonnelDialog}>
+                      <DialogTrigger asChild>
+                        <Button className="w-full justify-start">
+                          <UserPlus className="h-4 w-4 mr-2" />
+                          Add New Personnel
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-md">
+                        <DialogHeader>
+                          <DialogTitle className="font-serif">Add New Personnel</DialogTitle>
+                          <DialogDescription>Add a new staff member to the personnel directory</DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-3">
+                          <div>
+                            <Label>Name</Label>
+                            <Input value={newName} onChange={(e) => setNewName(e.target.value)} className="mt-1" />
+                          </div>
+                          <div>
+                            <Label>Role</Label>
+                            <Input value={newRole} onChange={(e) => setNewRole(e.target.value)} className="mt-1" />
+                          </div>
+                          <div>
+                            <Label>Department</Label>
+                            <Select onValueChange={setNewDepartment}>
+                              <SelectTrigger className="mt-2">
+                                <SelectValue placeholder="Select department" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {departments.map((d) => (<SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label>Email</Label>
+                            <Input value={newEmail} onChange={(e) => setNewEmail(e.target.value)} className="mt-1" />
+                          </div>
+                          <div>
+                            <Label>Phone</Label>
+                            <Input value={newPhone} onChange={(e) => setNewPhone(e.target.value)} className="mt-1" />
+                          </div>
+                          <div>
+                            <Label>Availability</Label>
+                            <Select onValueChange={setNewAvailability}>
+                              <SelectTrigger className="mt-2">
+                                <SelectValue placeholder="Availability" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Available">Available</SelectItem>
+                                <SelectItem value="Busy">Busy</SelectItem>
+                                <SelectItem value="On Leave">On Leave</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label>Max Workload</Label>
+                            <Input type="number" value={String(newMaxWorkload)} onChange={(e) => setNewMaxWorkload(Number(e.target.value))} className="mt-1" />
+                          </div>
+                          <div>
+                            <Label>Skills (comma-separated)</Label>
+                            <Input value={newSkills} onChange={(e) => setNewSkills(e.target.value)} className="mt-1" />
+                          </div>
+                          <div className="flex justify-end space-x-2 mt-4">
+                            <Button variant="outline" onClick={() => setShowAddPersonnelDialog(false)}>Cancel</Button>
+                            <Button onClick={handleCreatePersonnel}>Create</Button>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                     <Button variant="outline" className="w-full justify-start bg-transparent">
                       <BarChart3 className="h-4 w-4 mr-2" />
                       Workload Analytics
@@ -847,16 +1153,64 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
             </div>
           </TabsContent>
 
-          <TabsContent value="reports" className="space-y-6">
+          <TabsContent value="feedback" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="font-serif">Progress Reports</CardTitle>
-                <CardDescription>Monitor task progress and generate reports</CardDescription>
+                <CardTitle className="font-serif">User Feedback</CardTitle>
+                <CardDescription>Feedback submitted by citizens</CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground">
-                  Progress tracking and reporting features will be implemented in the next phase.
-                </p>
+                <div className="space-y-3">
+                  {feedbacks.length === 0 ? (
+                    <p className="text-muted-foreground">No feedback available.</p>
+                  ) : (
+                    feedbacks.map((fb) => (
+                      <div key={fb.id || fb._id} className="p-3 border border-border rounded-lg">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h4 className="font-medium">{fb.name} {fb.rating ? (<span className="text-sm text-muted-foreground">• {fb.rating}⭐</span>) : null}</h4>
+                            <p className="text-sm text-muted-foreground">{fb.email || '—'}</p>
+                          </div>
+                          <span className="text-xs text-muted-foreground">{new Date(fb.createdAt).toLocaleString()}</span>
+                        </div>
+                        <p className="mt-2 text-sm">{fb.message}</p>
+                        <div className="flex space-x-2 mt-2">
+                          <Button size="sm" variant="outline" onClick={async () => {
+                            try {
+                              const res = await fetch(`http://localhost:5000/api/feedback/${fb.id}/resolve`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ resolutionNotes: 'Marked resolved by admin' }) })
+                              if (res.ok) {
+                                const json = await res.json()
+                                setFeedbacks((prev) => prev.map((p) => (p.id === fb.id ? json.feedback : p)))
+                              }
+                            } catch (err) { console.error(err) }
+                          }}>{fb.resolved ? 'Resolved' : 'Mark Resolved'}</Button>
+
+                          <Button size="sm" variant="outline" onClick={async () => {
+                            const comment = prompt('Enter comment to send to user:')
+                            if (!comment) return
+                            const markResolved = confirm('Mark this feedback as resolved?')
+                            try {
+                              const res = await fetch(`http://localhost:5000/api/feedback/${fb.id}/comment`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ author: user?.name || 'Admin', message: comment, resolved: markResolved, resolutionNotes: markResolved ? 'Resolved by admin via comment' : undefined }) })
+                              if (res.ok) {
+                                const json = await res.json()
+                                setFeedbacks((prev) => prev.map((p) => (p.id === fb.id ? json.feedback : p)))
+                                alert('Comment sent and user notified (if email available).')
+                              }
+                            } catch (err) { console.error(err); alert('Failed to add comment') }
+                          }}>Comment</Button>
+
+                          <Button size="sm" variant="destructive" onClick={async () => {
+                            if (!confirm('Delete this feedback?')) return
+                            try {
+                              const res = await fetch(`http://localhost:5000/api/feedback/${fb.id}`, { method: 'DELETE' })
+                              if (res.ok) setFeedbacks((prev) => prev.filter((p) => p.id !== fb.id))
+                            } catch (err) { console.error(err) }
+                          }}>Delete</Button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -887,39 +1241,41 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
               <div className="space-y-4">
                 <div>
                   <Label className="text-sm font-medium">Select Personnel</Label>
-                  <Select value={selectedPersonnel} onValueChange={setSelectedPersonnel}>
-                    <SelectTrigger className="mt-2">
-                      <SelectValue placeholder="Choose a person to assign" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {personnel
-                        .filter((p) => p.availability !== "On Leave")
-                        .filter((p) => {
-                          const dept = departments.find((d) => d.id === p.department)
-                          return dept?.categories.includes(assignmentComplaint.category)
-                        })
-                        .map((person) => (
-                          <SelectItem key={person.id} value={person.id}>
-                            <div className="flex items-center space-x-2">
-                              <span>{person.name}</span>
-                              <Badge className={getAvailabilityColor(person.availability)} variant="secondary">
-                                {person.availability}
-                              </Badge>
-                              <span className="text-xs text-muted-foreground">
-                                ({person.currentWorkload}/{person.maxWorkload})
-                              </span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
+                    <Select value={selectedPersonnel} onValueChange={setSelectedPersonnel}>
+                      <SelectTrigger className="mt-2">
+                        <SelectValue placeholder="Choose a person to assign" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(() => {
+                          const available = personnel.filter((p) => p.availability !== "On Leave")
+                          const category = assignmentComplaint?.category
+                          const filtered = category
+                            ? available.filter((p) => departments.find((d) => d.id === p.department)?.categories.includes(category))
+                            : available
+                          const list = filtered.length ? filtered : available
+                          return list.map((person) => (
+                            <SelectItem key={person.id} value={person.id}>
+                              <div className="flex items-center space-x-2">
+                                <span>{person.name}</span>
+                                <Badge className={getAvailabilityColor(person.availability)} variant="secondary">
+                                  {person.availability || "Unknown"}
+                                </Badge>
+                                <span className="text-xs text-muted-foreground">
+                                  ({person.currentWorkload || 0}/{person.maxWorkload || 0})
+                                </span>
+                              </div>
+                            </SelectItem>
+                          ))
+                        })()}
+                      </SelectContent>
+                    </Select>
                 </div>
 
                 {selectedPersonnel && (
                   <div className="p-3 bg-muted rounded-lg">
                     {(() => {
                       const person = personnel.find((p) => p.id === selectedPersonnel)
-                      return person ? (
+                        return person ? (
                         <div>
                           <div className="flex items-center space-x-2 mb-2">
                             <Avatar className="h-8 w-8">
@@ -931,9 +1287,9 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                             </div>
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            <p>Skills: {person.skills.join(", ")}</p>
+                            <p>Skills: {person.skills?.join(", ") || "—"}</p>
                             <p>
-                              Contact: {person.email} | {person.phone}
+                              Contact: {person.email || "—"} | {person.phone || "—"}
                             </p>
                           </div>
                         </div>
@@ -957,9 +1313,12 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                   <Button variant="outline" onClick={() => setShowAssignmentDialog(false)}>
                     Cancel
                   </Button>
-                  <Button  disabled={!selectedPersonnel}>
+                  <Button onClick={handleSubmitAssignment} disabled={!selectedPersonnel}>
                     <Send className="h-4 w-4 mr-2" />
                     Assign Task
+                  </Button>
+                  <Button variant="destructive" onClick={handleUnassignAssignment} disabled={!assignmentComplaint || assignmentComplaint.assignedTo === 'Unassigned'}>
+                    Unassign
                   </Button>
                 </div>
               </div>
@@ -1063,11 +1422,20 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
 
                   <div>
                     <Label className="text-sm font-medium">Add Update</Label>
-                    <Textarea placeholder="Enter progress update..." className="mt-2" rows={3} />
-                    <Button size="sm" className="mt-2">
-                      <MessageSquare className="h-4 w-4 mr-2" />
-                      Add Update
-                    </Button>
+                    <Textarea
+                      placeholder="Enter progress update..."
+                      className="mt-2"
+                      rows={3}
+                      value={newUpdateText}
+                      onChange={(e) => setNewUpdateText((e.target as HTMLTextAreaElement).value)}
+                    />
+                    <div className="flex space-x-2 mt-2">
+                      <Button size="sm" onClick={handleAddUpdate} disabled={!newUpdateText.trim()}>
+                        <MessageSquare className="h-4 w-4 mr-2" />
+                        Add Update
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setNewUpdateText("")}>Cancel</Button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1075,6 +1443,124 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
           )}
         </DialogContent>
       </Dialog>
+        {/* View Personnel Dialog */}
+        <Dialog open={showViewPersonDialog} onOpenChange={(open) => { if (!open) setSelectedPerson(null); setShowViewPersonDialog(open) }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="font-serif">Personnel Profile</DialogTitle>
+              <DialogDescription>Details for {selectedPerson?.name}</DialogDescription>
+            </DialogHeader>
+            {selectedPerson && (
+              <div className="space-y-3">
+                <div className="flex items-center space-x-3">
+                  <Avatar>
+                    <BoringAvatar name={selectedPerson.name} variant="pixel" />
+                  </Avatar>
+                  <div>
+                    <h4 className="font-medium">{selectedPerson.name}</h4>
+                    <p className="text-sm text-muted-foreground">{selectedPerson.role}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-2">
+                  <div>
+                    <Label className="text-xs">Department</Label>
+                    <p className="text-sm text-muted-foreground">{departments.find((d) => d.id === selectedPerson.department)?.name || selectedPerson.department || '—'}</p>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Contact</Label>
+                    <p className="text-sm text-muted-foreground">{selectedPerson.email || '—'} • {selectedPerson.phone || '—'}</p>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Availability</Label>
+                    <p className="text-sm text-muted-foreground">{selectedPerson.availability || '—'}</p>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Workload</Label>
+                    <p className="text-sm text-muted-foreground">{selectedPerson.currentWorkload || 0}/{selectedPerson.maxWorkload || 0}</p>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Skills</Label>
+                    <p className="text-sm text-muted-foreground">{(selectedPerson.skills || []).join(', ') || '—'}</p>
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-2 mt-4">
+                  <Button variant="outline" onClick={() => setShowViewPersonDialog(false)}>Close</Button>
+                  <Button onClick={() => { setShowViewPersonDialog(false); setShowEditPersonDialog(true);
+                      // prefill edit fields
+                      setEditName(selectedPerson.name || ''); setEditRole(selectedPerson.role || ''); setEditDepartment(selectedPerson.department || ''); setEditEmail(selectedPerson.email || ''); setEditPhone(selectedPerson.phone || ''); setEditAvailability(selectedPerson.availability || 'Available'); setEditMaxWorkload(selectedPerson.maxWorkload || 8); setEditSkills((selectedPerson.skills || []).join(', '))
+                    }}>Edit</Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Personnel Dialog */}
+        <Dialog open={showEditPersonDialog} onOpenChange={(open) => { if (!open) setSelectedPerson(null); setShowEditPersonDialog(open) }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="font-serif">Update Personnel</DialogTitle>
+              <DialogDescription>Modify staff details</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div>
+                <Label>Name</Label>
+                <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="mt-1" />
+              </div>
+              <div>
+                <Label>Role</Label>
+                <Input value={editRole} onChange={(e) => setEditRole(e.target.value)} className="mt-1" />
+              </div>
+              <div>
+                <Label>Department</Label>
+                <Select value={editDepartment} onValueChange={setEditDepartment}>
+                  <SelectTrigger className="mt-2">
+                    <SelectValue placeholder="Select department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {departments.map((d) => (<SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Email</Label>
+                <Input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} className="mt-1" />
+              </div>
+              <div>
+                <Label>Phone</Label>
+                <Input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} className="mt-1" />
+              </div>
+              <div>
+                <Label>Availability</Label>
+                <Select value={editAvailability} onValueChange={setEditAvailability}>
+                  <SelectTrigger className="mt-2">
+                    <SelectValue placeholder="Availability" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Available">Available</SelectItem>
+                    <SelectItem value="Busy">Busy</SelectItem>
+                    <SelectItem value="On Leave">On Leave</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Max Workload</Label>
+                <Input type="number" value={String(editMaxWorkload)} onChange={(e) => setEditMaxWorkload(Number(e.target.value))} className="mt-1" />
+              </div>
+              <div>
+                <Label>Skills (comma-separated)</Label>
+                <Input value={editSkills} onChange={(e) => setEditSkills(e.target.value)} className="mt-1" />
+              </div>
+
+              <div className="flex justify-end space-x-2 mt-4">
+                <Button variant="outline" onClick={() => setShowEditPersonDialog(false)}>Cancel</Button>
+                <Button onClick={handleUpdatePersonnelSubmit}>Save</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
     </div>
   )
 }

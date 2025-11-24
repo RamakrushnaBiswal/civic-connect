@@ -29,8 +29,26 @@ function Feedback() {
 
   function handleSubmit(e) {
     e.preventDefault();
-    // handle form submission here (API call etc.)
-    alert("Submitted! (Demo)");
+    // send feedback to backend
+    const payload = {
+      name: values.name,
+      email: values.email,
+      message: values.message,
+      metadata: { type: values.type }
+    }
+
+    fetch('http://localhost:5000/api/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then((res) => {
+      if (!res.ok) throw new Error('Failed to submit feedback')
+      alert('Thank you — your feedback was submitted.')
+      setValues({ name: '', email: '', type: '', message: '', photo: null })
+    }).catch((err) => {
+      console.error(err)
+      alert('Failed to submit feedback. Please try again later.')
+    })
   }
 
   return (
