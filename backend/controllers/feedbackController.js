@@ -84,6 +84,32 @@ exports.createFeedback = async (req, res) => {
     })
 
     await feedback.save()
+
+    // send admin notification
+    try {
+      const adminTo = process.env.ADMIN_EMAIL || process.env.FROM_EMAIL || process.env.SMTP_USER
+      if (adminTo) {
+        const subjectAdmin = `New Contact/Feedback received: ${feedback.id} - ${feedback.metadata?.type || 'General'}`
+        const textAdmin = `New message from ${feedback.name} (${feedback.email || 'no-email'}):\n\n${feedback.message}`
+        const htmlAdmin = `<p>New message from <strong>${feedback.name}</strong> (${feedback.email || 'no-email'})</p><p><strong>Type:</strong> ${feedback.metadata?.type || 'General'}</p><p><strong>Message:</strong></p><blockquote>${feedback.message}</blockquote><p>Feedback ID: ${feedback.id}</p>`
+        sendEmailNotification({ to: adminTo, subject: subjectAdmin, text: textAdmin, html: htmlAdmin })
+      }
+    } catch (e) {
+      console.warn('Failed to send admin notification', e)
+    }
+
+    // send confirmation to user
+    try {
+      if (feedback.email) {
+        const subjectUser = `Thanks for contacting Civic-Connect`;
+        const textUser = `Hello ${feedback.name},\n\nThanks for reaching out to Civic-Connect. We have received your message and will get back to you soon.\n\nYour message: ${feedback.message}`
+        const htmlUser = `<p>Hello ${feedback.name},</p><p>Thanks for reaching out to Civic-Connect. We have received your message and will get back to you soon.</p><p><strong>Your message:</strong></p><blockquote>${feedback.message}</blockquote>`
+        sendEmailNotification({ to: feedback.email, subject: subjectUser, text: textUser, html: htmlUser })
+      }
+    } catch (e) {
+      console.warn('Failed to send user confirmation', e)
+    }
+
     res.status(201).json({ feedback })
   } catch (err) {
     console.error('Error creating feedback', err)

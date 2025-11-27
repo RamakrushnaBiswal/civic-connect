@@ -1,10 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
+import { AuthContext } from "../contexts/AuthContext";
 import { Link } from "react-router-dom";
 
-const Navbar = ({ user, setUser }) => {
+const Navbar = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const { user, logout } = useContext(AuthContext);
 
   return (
     <nav className="bg-white px-10 py-2 flex items-center justify-between sticky top-0 z-50">
@@ -15,8 +17,10 @@ const Navbar = ({ user, setUser }) => {
         <a href="/" className="text-gray-700 hover:text-blue-600 transition font-medium">Home</a>
         <a href="#about" className="text-gray-700 hover:text-blue-600 transition font-medium">About</a>
         <a href="#services" className="text-gray-700 hover:text-blue-600 transition font-medium">Services</a>
-        <a href="#report" className="text-gray-700 hover:text-blue-600 transition font-medium">Reports</a>
-        <a href="#contact" className="text-gray-700 hover:text-blue-600 transition font-medium">Contact</a>
+        {user && (
+          <Link to="/dashboard" className="text-gray-700 hover:text-blue-600 transition font-medium">Dashboard</Link>
+        )}
+        <Link to="/contact" className="text-gray-700 hover:text-blue-600 transition font-medium">Contact</Link>
         {!user ? (
           <Link to="/signup" className="bg-blue-600 text-white px-5 py-2 rounded-full shadow hover:bg-blue-700 font-semibold transition cursor-pointer">Sign In</Link>
         ) : (
@@ -42,12 +46,9 @@ const Navbar = ({ user, setUser }) => {
                       <div className="flex justify-center gap-4">
                         <button
                           className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                          onClick={async () => {
-                            await fetch('http://localhost:5000/api/logout', {
-                              method: 'POST',
-                              credentials: 'include',
-                            });
-                            setUser(null);
+                          onClick={() => {
+                            // Use central logout that clears JWT/localStorage and redirects
+                            logout({ redirect: true });
                             setDropdownOpen(false);
                             setShowLogoutConfirm(false);
                           }}
@@ -80,8 +81,12 @@ const Navbar = ({ user, setUser }) => {
         <div className="absolute top-16 left-0 w-full bg-white shadow-md flex flex-col items-center py-4 md:hidden animate-fade-in">
           <a href="/" className="text-gray-700 hover:text-blue-600 transition font-medium py-2 w-full text-center">Home</a>
           <a href="#about" className="text-gray-700 hover:text-blue-600 transition font-medium py-2 w-full text-center">About</a>
-          <a href="#contact" className="text-gray-700 hover:text-blue-600 transition font-medium py-2 w-full text-center">Contact</a>
-          <a href="#report" className="text-gray-700 hover:text-blue-600 transition font-medium py-2 w-full text-center">Reports</a>
+          <Link to="/contact" className="text-gray-700 hover:text-blue-600 transition font-medium py-2 w-full text-center">Contact</Link>
+          {user ? (
+            <Link to="/dashboard" className="text-gray-700 hover:text-blue-600 transition font-medium py-2 w-full text-center">Dashboard</Link>
+          ) : (
+            <a href="#report" className="text-gray-700 hover:text-blue-600 transition font-medium py-2 w-full text-center">Reports</a>
+          )}
           <a href="#services" className="text-gray-700 hover:text-blue-600 transition font-medium py-2 w-full text-center">Services</a>
           {!user ? (
             <Link to="/signup" className="bg-blue-600 text-white px-5 py-2 rounded-full shadow hover:bg-blue-700 font-semibold transition mt-2 w-full text-center">Sign In</Link>
@@ -108,15 +113,11 @@ const Navbar = ({ user, setUser }) => {
                         <div className="flex justify-center gap-4">
                           <button
                             className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                            onClick={async () => {
-                              await fetch('http://localhost:5000/api/logout', {
-                                method: 'POST',
-                                credentials: 'include',
-                              });
-                              setUser(null);
-                              setDropdownOpen(false);
-                              setShowLogoutConfirm(false);
-                            }}
+                            onClick={() => {
+                                logout({ redirect: true });
+                                setDropdownOpen(false);
+                                setShowLogoutConfirm(false);
+                              }}
                           >Yes</button>
                           <button
                             className="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400"

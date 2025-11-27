@@ -1,12 +1,16 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import React, { useState, useEffect } from 'react';
+import React, { useContext } from 'react';
+import { AuthContext } from './components/contexts/AuthContext';
 import './App.css';
 import Navbar from './components/shared/Navbar';
 import Footer from './components/shared/Footer';
 import Home from './components/shared/Home';
 import Signup from './components/shared/Signup';
+import ReportDetails from './components/shared/ReportDetails';
+import Dashboard from './components/shared/Dashboard';
 import PermissionPage from './components/Services/Permissions';
 import Feedback from './components/Services/Feedback';
+import ContactUs from './components/shared/ContactUs';
 import ApplyLicenseForm from './components/Services/E-license';
 import DeathForm from './components/Services/DeathCertificate';
 import BirthRegistrationForm from './components/Services/BirthCertificate';
@@ -19,32 +23,17 @@ import WaterConnectionForm from './components/Services/WaterConn';
 import AddEngineerForm from './components/Services/C&D';
 
 function App() {
-  const [user, setUser] = useState(null);
-
-  useEffect(() => {
-    fetch('http://localhost:5000/api/profile', {
-      method: 'GET',
-      credentials: 'include',
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          setUser({ name: data.name, email: data.email });
-        } else {
-          setUser(null);
-        }
-      })
-      .catch(() => setUser(null));
-  }, []);
+  const { user } = useContext(AuthContext);
 
   return (
     <Router>
-      <Navbar user={user} setUser={setUser} />
+      <Navbar />
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/signup" element={<Signup setUser={setUser} />} />
+        <Route path="/signup" element={<Signup />} />
         <Route path="/permissions" element={<PermissionPage />} />
         <Route path="/feedback" element={<Feedback />} />
+        <Route path="/contact" element={<ContactUs />} />
         <Route path="/e-license" element={<ApplyLicenseForm />} />
         <Route path="/death-certificate" element={<DeathForm />} />
         <Route path="/birth-certificate" element={<BirthRegistrationForm />} />
@@ -54,6 +43,8 @@ function App() {
         <Route path="/startup" element={<PermissionRequestForm />} />
         <Route path="/water-connection" element={<WaterConnectionForm />} />
         <Route path="/c-and-d" element={<AddEngineerForm />} />
+        <Route path="/reports/:id" element={<ReportDetails />} />
+        <Route path="/dashboard" element={<Dashboard />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       <Footer />

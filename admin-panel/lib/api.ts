@@ -35,7 +35,7 @@ export const fetchReports = async (): Promise<Report[]> => {
 
 export const updateReport = async (_id: string, updates: Record<string, any>) => {
   try {
-    const response = await fetch(`http://localhost:5000/api/reports/reports/${_id}`, {
+    const response = await fetch(`http://localhost:5000/api/reports/${_id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates),
@@ -56,7 +56,7 @@ export const updateReport = async (_id: string, updates: Record<string, any>) =>
 
 export const assignReport = async (_id: string, payload: { assignedTo?: string; note?: string; assignedBy?: string; assignedPersonnelId?: string }) => {
   try {
-    const response = await fetch(`http://localhost:5000/api/reports/reports/${_id}/assign`, {
+    const response = await fetch(`http://localhost:5000/api/reports/${_id}/assign`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -119,7 +119,7 @@ export const seedPersonnel = async (personnel: any[]) => {
 
 export const unassignReport = async (_id: string, payload: { note?: string; unassignedBy?: string } = {}) => {
   try {
-    const response = await fetch(`http://localhost:5000/api/reports/reports/${_id}/unassign`, {
+    const response = await fetch(`http://localhost:5000/api/reports/${_id}/unassign`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),

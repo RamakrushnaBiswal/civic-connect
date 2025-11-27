@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { addReport,showReports,getReportById,updateReport, assignReport,unassignReport } = require('../controllers/reportController');
+const { addReport,showReports,getReportById,updateReport, assignReport,unassignReport, getMyReports } = require('../controllers/reportController');
+const authMiddleware = require('../middleware/authMiddleware');
 
 const multer = require('multer');
 const path = require('path');
@@ -18,9 +19,10 @@ const upload = multer({ storage });
 
 router.post('/add-report', upload.single('photo'), addReport);
 router.get('/show-reports', showReports);
-router.get('/reports/:id', getReportById);
-router.put('/reports/:id', updateReport);
-router.put('/reports/:id/assign', assignReport);
-router.put('/reports/:id/unassign', unassignReport);
+router.get('/my-reports', authMiddleware, getMyReports);
+router.get('/:id', getReportById);
+router.put('/:id', updateReport);
+router.put('/:id/assign', assignReport);
+router.put('/:id/unassign', unassignReport);
 
 module.exports = router;
