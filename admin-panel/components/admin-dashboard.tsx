@@ -170,10 +170,16 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
   const [newAvailability, setNewAvailability] = useState("Available")
   const [newMaxWorkload, setNewMaxWorkload] = useState<number>(8)
   const [newSkills, setNewSkills] = useState("")
+  const [newId, setNewId] = useState("")
+  const [newPassword, setNewPassword] = useState("")
+  const [newSendCredentials, setNewSendCredentials] = useState(false)
+  const [newSendResetLink, setNewSendResetLink] = useState(true)
+  const [newMustChangePassword, setNewMustChangePassword] = useState(true)
 
   const handleCreatePersonnel = async () => {
     if (!newName.trim()) return
-    const payload = {
+      const payload = {
+      id: newId?.trim() || undefined,
       name: newName.trim(),
       role: newRole.trim() || undefined,
       department: newDepartment || undefined,
@@ -182,6 +188,10 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
       availability: newAvailability || undefined,
       maxWorkload: Number(newMaxWorkload) || 8,
       skills: newSkills ? newSkills.split(',').map(s => s.trim()).filter(Boolean) : undefined,
+      password: newPassword || undefined,
+      sendCredentials: newSendCredentials,
+      sendResetLink: newSendResetLink,
+      mustChangePassword: newMustChangePassword,
     }
 
     try {
@@ -201,6 +211,11 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
       setNewAvailability("Available")
       setNewMaxWorkload(8)
       setNewSkills("")
+      setNewId("")
+      setNewPassword("")
+      setNewMustChangePassword(true)
+      setNewSendCredentials(false)
+      setNewSendResetLink(true)
       setShowAddPersonnelDialog(false)
     } catch (err) {
       console.error('Failed to create personnel', err)
@@ -223,7 +238,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
     location: report.location,
     assignedTo: report.assignedTo || (report.assignedPersonnelId ? (personnel.find((p) => p.id === report.assignedPersonnelId)?.name) : "Unassigned") || "Unassigned",
     assignedPersonnelId: report.assignedPersonnelId || null,
-    slaDeadline: "",
+    slaDeadline: report.slaDeadline ? new Date(report.slaDeadline).toLocaleString() : "",
     photo: report.photo,
     updates: report.updates || [],
   })
@@ -278,6 +293,10 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
   const [editAvailability, setEditAvailability] = useState("")
   const [editMaxWorkload, setEditMaxWorkload] = useState<number>(8)
   const [editSkills, setEditSkills] = useState("")
+  const [editPassword, setEditPassword] = useState("")
+  const [editSendPassword, setEditSendPassword] = useState(true)
+  const [editSendResetLink, setEditSendResetLink] = useState(false)
+  const [editMustChangePassword, setEditMustChangePassword] = useState(false)
 
   const filteredComplaints = complaints.filter((complaint: any) => {
     const matchesSearch =
@@ -498,6 +517,9 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
       availability: editAvailability || undefined,
       maxWorkload: Number(editMaxWorkload) || 8,
       skills: editSkills ? editSkills.split(',').map((s) => s.trim()).filter(Boolean) : undefined,
+      // For password updates, send fields; otherwise allow 'mustChangePassword' separately
+      ...(editPassword ? { password: editPassword, sendPasswordReset: editSendPassword, sendResetLink: editSendResetLink } : {}),
+      mustChangePassword: editMustChangePassword,
     }
 
     try {
@@ -945,6 +967,8 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                             <div className="flex-1">
                               <div className="flex items-center space-x-2 mb-1">
                                 <h4 className="font-medium text-foreground">{person.name}</h4>
+                                <Badge className="bg-gray-100 text-gray-800">{person.id}</Badge>
+                                {person.mustChangePassword && <Badge className="bg-red-100 text-red-800">Require change</Badge>}
                                 <Badge className={getAvailabilityColor(person.availability)}>
                                   {person.availability || "Unknown"}
                                 </Badge>
@@ -981,6 +1005,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                               setEditAvailability(person.availability || "Available")
                               setEditMaxWorkload(person.maxWorkload || 8)
                               setEditSkills((person.skills || []).join(", "))
+                              setEditMustChangePassword(!!person.mustChangePassword)
                               setShowEditPersonDialog(true)
                             }}>
                               <Calendar className="h-4 w-4 mr-2" />
@@ -1074,7 +1099,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                           Add New Personnel
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="max-w-md">
+                      <DialogContent className="w-full max-w-md md:max-w-lg mx-auto max-h-[80vh] overflow-y-auto rounded-lg p-4">
                         <DialogHeader>
                           <DialogTitle className="font-serif">Add New Personnel</DialogTitle>
                           <DialogDescription>Add a new staff member to the personnel directory</DialogDescription>
@@ -1083,6 +1108,26 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                           <div>
                             <Label>Name</Label>
                             <Input value={newName} onChange={(e) => setNewName(e.target.value)} className="mt-1" />
+                          </div>
+                          <div>
+                            <Label>ID</Label>
+                            <Input value={newId} onChange={(e) => setNewId(e.target.value)} className="mt-1" placeholder="Optional: provide id like p123" />
+                          </div>
+                          <div>
+                            <Label>Password</Label>
+                            <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="mt-1" placeholder="Optional" />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Checkbox checked={newSendCredentials} onCheckedChange={(v) => setNewSendCredentials(Boolean(v))} />
+                            <span className="text-sm text-muted-foreground">Send credentials via email</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Checkbox checked={newSendResetLink} onCheckedChange={(v) => setNewSendResetLink(Boolean(v))} />
+                            <span className="text-sm text-muted-foreground">Send setup link (recommended)</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Checkbox checked={newMustChangePassword} onCheckedChange={(v) => setNewMustChangePassword(Boolean(v))} />
+                            <span className="text-sm text-muted-foreground">Require change on first login</span>
                           </div>
                           <div>
                             <Label>Role</Label>
@@ -1445,7 +1490,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
       </Dialog>
         {/* View Personnel Dialog */}
         <Dialog open={showViewPersonDialog} onOpenChange={(open) => { if (!open) setSelectedPerson(null); setShowViewPersonDialog(open) }}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="w-full max-w-md md:max-w-lg mx-auto max-h-[80vh] overflow-y-auto rounded-lg p-4">
             <DialogHeader>
               <DialogTitle className="font-serif">Personnel Profile</DialogTitle>
               <DialogDescription>Details for {selectedPerson?.name}</DialogDescription>
@@ -1471,6 +1516,12 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                     <Label className="text-xs">Contact</Label>
                     <p className="text-sm text-muted-foreground">{selectedPerson.email || '—'} • {selectedPerson.phone || '—'}</p>
                   </div>
+                  {selectedPerson.mustChangePassword && (
+                    <div>
+                      <Label className="text-xs">Security</Label>
+                      <p className="text-sm text-muted-foreground">This user is required to change password on their next login.</p>
+                    </div>
+                  )}
                   <div>
                     <Label className="text-xs">Availability</Label>
                     <p className="text-sm text-muted-foreground">{selectedPerson.availability || '—'}</p>
@@ -1499,7 +1550,7 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
 
         {/* Edit Personnel Dialog */}
         <Dialog open={showEditPersonDialog} onOpenChange={(open) => { if (!open) setSelectedPerson(null); setShowEditPersonDialog(open) }}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="w-full max-w-md md:max-w-lg mx-auto max-h-[80vh] overflow-y-auto rounded-lg p-4">
             <DialogHeader>
               <DialogTitle className="font-serif">Update Personnel</DialogTitle>
               <DialogDescription>Modify staff details</DialogDescription>
@@ -1552,6 +1603,22 @@ export function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
               <div>
                 <Label>Skills (comma-separated)</Label>
                 <Input value={editSkills} onChange={(e) => setEditSkills(e.target.value)} className="mt-1" />
+              </div>
+              <div>
+                <Label>New Password (optional)</Label>
+                <Input type="password" value={editPassword} onChange={(e) => setEditPassword(e.target.value)} className="mt-1" placeholder="Leave empty to keep current password" />
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox checked={editSendPassword} onCheckedChange={(v) => setEditSendPassword(Boolean(v))} />
+                <span className="text-sm text-muted-foreground">Send new password via email</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox checked={editSendResetLink} onCheckedChange={(v) => setEditSendResetLink(Boolean(v))} />
+                <span className="text-sm text-muted-foreground">Send password reset link (recommended)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox checked={editMustChangePassword} onCheckedChange={(v) => setEditMustChangePassword(Boolean(v))} />
+                <span className="text-sm text-muted-foreground">Require change on next login</span>
               </div>
 
               <div className="flex justify-end space-x-2 mt-4">

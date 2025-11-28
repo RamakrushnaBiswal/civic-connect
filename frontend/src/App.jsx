@@ -9,7 +9,11 @@ import Signup from './components/shared/Signup';
 import ReportDetails from './components/shared/ReportDetails';
 import Dashboard from './components/shared/Dashboard';
 import PermissionPage from './components/Services/Permissions';
+import WorkerLogin from './components/owner/WorkerLogin';
+import WorkerDashboard from './components/owner/WorkerDashboard';
+import WorkerChangePassword from './components/owner/WorkerChangePassword';
 import Feedback from './components/Services/Feedback';
+import WorkerRequestReset from './components/owner/WorkerRequestReset';
 import ContactUs from './components/shared/ContactUs';
 import ApplyLicenseForm from './components/Services/E-license';
 import DeathForm from './components/Services/DeathCertificate';
@@ -44,6 +48,11 @@ function App() {
         <Route path="/water-connection" element={<WaterConnectionForm />} />
         <Route path="/c-and-d" element={<AddEngineerForm />} />
         <Route path="/reports/:id" element={<ReportDetails />} />
+        <Route path="/owner/login" element={<WorkerLogin />} />
+        <Route path="/owner/dashboard" element={<WorkerDashboard />} />
+        <Route path="/owner/change-password" element={<WorkerChangePassword />} />
+        <Route path="/owner/reset-password" element={<WorkerChangePassword />} />
+        <Route path="/owner/request-reset" element={<WorkerRequestReset />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="*" element={<NotFound />} />
       </Routes>

@@ -7,6 +7,7 @@ const Navbar = () => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const { user, logout } = useContext(AuthContext);
+  const personnelToken = typeof window !== 'undefined' ? localStorage.getItem('personnel_token') : null;
 
   return (
     <nav className="bg-white px-10 py-2 flex items-center justify-between sticky top-0 z-50">
@@ -19,6 +20,11 @@ const Navbar = () => {
         <a href="#services" className="text-gray-700 hover:text-blue-600 transition font-medium">Services</a>
         {user && (
           <Link to="/dashboard" className="text-gray-700 hover:text-blue-600 transition font-medium">Dashboard</Link>
+        )}
+        {!personnelToken ? (
+          <Link to="/owner/login" className="text-gray-700 hover:text-blue-600 transition font-medium">Worker</Link>
+        ) : (
+          <Link to="/owner/dashboard" className="text-gray-700 hover:text-blue-600 transition font-medium">Worker Dashboard</Link>
         )}
         <Link to="/contact" className="text-gray-700 hover:text-blue-600 transition font-medium">Contact</Link>
         {!user ? (
@@ -82,6 +88,11 @@ const Navbar = () => {
           <a href="/" className="text-gray-700 hover:text-blue-600 transition font-medium py-2 w-full text-center">Home</a>
           <a href="#about" className="text-gray-700 hover:text-blue-600 transition font-medium py-2 w-full text-center">About</a>
           <Link to="/contact" className="text-gray-700 hover:text-blue-600 transition font-medium py-2 w-full text-center">Contact</Link>
+          {!personnelToken ? (
+            <Link to="/owner/login" className="text-gray-700 hover:text-blue-600 transition font-medium py-2 w-full text-center">Worker</Link>
+          ) : (
+            <Link to="/owner/dashboard" className="text-gray-700 hover:text-blue-600 transition font-medium py-2 w-full text-center">Worker Dashboard</Link>
+          )}
           {user ? (
             <Link to="/dashboard" className="text-gray-700 hover:text-blue-600 transition font-medium py-2 w-full text-center">Dashboard</Link>
           ) : (

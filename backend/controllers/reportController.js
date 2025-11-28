@@ -75,6 +75,7 @@ if (!Array.isArray(coordsArray) || coordsArray.length !== 2) {
       description,
       coordinates: coords,
       photo: imageUrl,
+      slaDeadline: req.body.slaDeadline ? new Date(req.body.slaDeadline) : null,
     });
     // console.log(newReport);
     try {
@@ -177,7 +178,12 @@ exports.updateReport = async (req, res) => {
 
     // Apply incoming updates to the report instance
     Object.keys(updateData).forEach((key) => {
-      report[key] = updateData[key];
+      // Convert incoming SLA to Date if provided as string
+      if (key === 'slaDeadline' && updateData[key]) {
+        report[key] = new Date(updateData[key])
+      } else {
+        report[key] = updateData[key]
+      }
     });
 
     // If not found by custom id, and the provided id looks like a Mongo ObjectId, try by _id
@@ -386,5 +392,56 @@ exports.unassignReport = async (req, res) => {
   } catch (error) {
     console.error('Error unassigning report:', error)
     res.status(500).json({ message: 'Server error', error: error.message })
+  }
+}
+
+// For personnel: get assigned reports
+exports.getAssignedReportsForPersonnel = async (req, res) => {
+  try {
+    if (!req.personnel || !req.personnel.id) return res.status(401).json({ message: 'Unauthorized' });
+    const assignedId = req.personnel.id;
+    const reports = await Report.find({ assignedPersonnelId: assignedId });
+    res.json({ reports });
+  } catch (error) {
+    console.error('Error fetching assigned reports for personnel:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+}
+
+// Personnel updates status for their assigned report
+exports.updateStatusByPersonnel = async (req, res) => {
+  try {
+    const { status, note } = req.body;
+    const id = req.params.id;
+    let report = await Report.findOne({ id });
+    if (!report) {
+      const isLikelyObjectId = /^[0-9a-fA-F]{24}$/.test(id);
+      if (isLikelyObjectId) report = await Report.findById(id);
+    }
+    if (!report) return res.status(404).json({ message: 'Report not found' });
+    if (!req.personnel || req.personnel.id !== report.assignedPersonnelId) {
+      return res.status(403).json({ message: 'Forbidden: not assigned to this report' });
+    }
+    const prevStatus = report.status;
+    if (status && status !== prevStatus) {
+      report.status = status;
+      report.updates = report.updates || [];
+      report.updates.push({ date: new Date().toISOString(), author: req.personnel.id, message: note || `Status changed to ${status}` });
+    }
+    await report.save();
+    // notify reporter
+    try {
+      if (report.email) {
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const subject = `Civic-Connect: Your report ${report.id} status updated by worker`;
+        const text = `Hello ${report.name || ''},\n\nThe status of your report ${report.id} has been updated to ${report.status} by a field worker.`;
+        const html = `<p>Hello ${report.name || ''},</p><p>The status of your report <strong>${report.id}</strong> has been updated to <strong>${report.status}</strong> by a field worker.</p><p>View details: <a href="${frontendUrl}/reports/${report.id}">${frontendUrl}/reports/${report.id}</a></p>`;
+        await sendMail({ to: report.email, subject, text, html });
+      }
+    } catch (e) { console.warn('Failed to send notification (personnel update):', e); }
+    res.json({ message: 'Status updated', report });
+  } catch (error) {
+    console.error('Error updating report status by personnel:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 }

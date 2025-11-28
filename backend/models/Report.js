@@ -43,7 +43,8 @@ const ReportSchema = new mongoose.Schema({
   },
   photo: { type: String,required: true },
   escalated: { type: Boolean, default: false },
-  workflowStage: { type: String, default: "New",enum: ["New", "In Progress", "Under Review", "Resolved", "Closed"] },
+  slaDeadline: { type: Date, default: null },
+  workflowStage: { type: String, default: "pending-review", enum: ["pending-review", "pending-assignment", "assigned", "in-progress", "repair-scheduled", "resolved", "escalated", "New", "In Progress", "Under Review", "Resolved", "Closed"] },
   updates: [updateSchema]
 },{ timestamps: true });
 
